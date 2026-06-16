@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII → DXF</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; padding: 2rem; }
+  h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 1.5rem; }
+
+  .app { display: grid; grid-template-columns: 310px 1fr; gap: 1.5rem; align-items: start; max-width: 1400px; }
+
+  .panel { background: #fff; border: 1px solid #e5e3de; border-radius: 10px; padding: 1.25rem; }
+  .panel-section { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid #f0ede8; }
+  .panel-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #aaa; }
+
+  .upload-zone { border: 1.5px dashed #d0cdc7; border-radius: 8px; padding: 1.25rem 1rem; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+  .upload-zone:hover { background: #faf9f7; border-color: #b0ada7; }
+  .upload-zone svg { display: block; margin: 0 auto 6px; color: #bbb; }
+  .upload-zone p { font-size: 13px; color: #999; }
+  .upload-zone p strong { color: #555; font-weight: 500; }
+
+  .control-row { margin-bottom: 0.7rem; }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #666; margin-bottom: 4px; }
+  .control-header .val { font-weight: 500; color: #1a1a1a; font-variant-numeric: tabular-nums; min-width: 3em; text-align: right; }
+
+  input[type=range] { width: 100%; height: 4px; -webkit-appearance: none; appearance: none; background: #e5e3de; border-radius: 2px; outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: #1a1a1a; cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%; background: #1a1a1a; border: none; cursor: pointer; }
+
+  select, input[type=text] { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid #e0ddd8; border-radius: 6px; background: #faf9f7; color: #1a1a1a; outline: none; transition: border-color 0.15s; }
+  select:focus, input[type=text]:focus { border-color: #999; background: #fff; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 0.55rem; }
+  .toggle-row:last-child { margin-bottom: 0; }
+  .toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track { position: absolute; inset: 0; background: #d5d2cc; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+  .toggle input:checked + .toggle-track { background: #1a1a1a; }
+  .toggle-track::before { content: ''; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: white; top: 3px; left: 3px; transition: transform 0.2s; }
+  .toggle input:checked + .toggle-track::before { transform: translateX(14px); }
+
+  .charset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 6px; }
+  .cs-btn { padding: 5px 7px; font-size: 11px; border: 1px solid #e0ddd8; border-radius: 6px; background: #faf9f7; color: #555; cursor: pointer; text-align: left; transition: all 0.12s; line-height: 1.3; }
+  .cs-btn .cs-name { font-weight: 500; color: #1a1a1a; display: block; }
+  .cs-btn .cs-preview { font-family: monospace; font-size: 10px; color: #999; display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cs-btn:hover { border-color: #aaa; background: #fff; }
+  .cs-btn.active { border-color: #1a1a1a; background: #1a1a1a; }
+  .cs-btn.active .cs-name { color: #fff; }
+  .cs-btn.active .cs-preview { color: #888; }
+
+  .fg-btn { padding: 5px 7px; font-size: 12px; border: 1px solid #e0ddd8; border-radius: 6px; background: #faf9f7; color: #555; cursor: pointer; transition: all 0.12s; font-family: monospace; }
+  .fg-btn:hover { border-color: #aaa; background: #fff; }
+  .fg-btn.active { border-color: #1a1a1a; background: #1a1a1a; color: #fff; }
+
+  .btn { width: 100%; padding: 10px; font-size: 13px; font-weight: 500; border-radius: 7px; border: 1px solid #e0ddd8; background: #fff; color: #1a1a1a; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background 0.15s; margin-bottom: 8px; }
+  .btn:last-child { margin-bottom: 0; }
+  .btn:hover { background: #f5f4f0; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn:disabled:hover { background: #fff; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn-primary:hover { background: #333; }
+  .btn-primary:disabled:hover { background: #1a1a1a; }
+
+  .reset-btn { font-size: 11px; color: #999; background: none; border: 1px solid #e0ddd8; border-radius: 5px; padding: 3px 8px; cursor: pointer; transition: all 0.12s; }
+  .reset-btn:hover { border-color: #aaa; color: #555; background: #faf9f7; }
+
+  .hint { font-size: 11px; color: #aaa; margin-top: 5px; line-height: 1.4; }
+  #custom-chars-wrap { display: none; margin-top: 8px; }
+
+  /* ── Right column ── */
+  .right-col { display: flex; flex-direction: column; gap: 1rem; }
+
+  /* Image preview + histogram panel */
+  .img-panel { background: #fff; border: 1px solid #e5e3de; border-radius: 10px; padding: 1rem; }
+  .img-panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; }
+  .img-panel-header .section-label { margin-bottom: 0; }
+  .view-tabs { display: flex; gap: 5px; margin-left: auto; }
+  .view-tab { padding: 4px 10px; font-size: 11px; border: 1px solid #e0ddd8; border-radius: 20px; background: #faf9f7; color: #666; cursor: pointer; transition: all 0.12s; }
+  .view-tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+  .img-preview-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .img-preview-wrap { position: relative; }
+  .img-preview-label { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .img-preview-wrap canvas { width: 100%; border-radius: 6px; display: block; background: #f5f4f0; }
+
+  /* Histogram */
+  .histogram-wrap { margin-top: 0.75rem; }
+  .histogram-label { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  #histogram-canvas { width: 100%; height: 60px; border-radius: 6px; display: block; background: #f5f4f0; }
+
+  /* ASCII preview */
+  .preview-area { background: #fff; border: 1px solid #e5e3de; border-radius: 10px; height: 520px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+  .preview-area.dark-bg { background: #111; }
+  #ascii-scale-wrap { transform-origin: center center; }
+  #ascii-output { font-family: 'Courier New', Courier, monospace; white-space: pre; line-height: 1; padding: 0; font-size: 10px; color: #1a1a1a; display: block; }
+  .dark-bg #ascii-output { color: #fff; }
+
+  .placeholder { text-align: center; color: #ccc; user-select: none; }
+  .placeholder svg { display: block; margin: 0 auto 10px; }
+  .placeholder p { font-size: 13px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 0; }
+  .stat { background: #fff; border: 1px solid #e5e3de; border-radius: 8px; padding: 8px 12px; }
+  .stat .v { font-size: 15px; font-weight: 500; }
+  .stat .l { font-size: 11px; color: #999; margin-top: 2px; }
+
+  .threshold-labels { display: flex; justify-content: space-between; font-size: 10px; color: #bbb; margin-top: 3px; }
+</style>
+</head>
+<body>
+<h1>ASCII → DXF</h1>
+
+<div class="app">
+  <!-- ── LEFT PANEL ── -->
+  <div class="panel">
+
+    <!-- IMAGE UPLOAD -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">Image</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <p><strong>Click to upload</strong> or drag image</p>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+      <canvas id="hidden-canvas" style="display:none"></canvas>
+    </div>
+
+    <!-- RESOLUTION -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">Resolution</div>
+      <div class="control-row">
+        <div class="control-header">Columns <span class="val" id="cols-val">80</span></div>
+        <input type="range" id="cols" min="20" max="400" value="80" step="1">
+      </div>
+      <div class="control-row">
+        <div class="control-header">Aspect correction <span class="val" id="aspect-val">0.45</span></div>
+        <input type="range" id="aspect" min="0.2" max="1.0" value="0.45" step="0.01">
+      </div>
+    </div>
+
+    <!-- IMAGE ADJUSTMENTS -->
+    <div class="panel-section">
+      <div class="section-header">
+        <div class="section-label">Image adjustments</div>
+        <button class="reset-btn" id="reset-adjustments">↺ reset</button>
+      </div>
+
+      <div class="control-row">
+        <div class="control-header">Brightness <span class="val" id="brightness-val">0</span></div>
+        <input type="range" id="brightness" min="-100" max="100" value="0" step="1">
+      </div>
+      <div class="control-row">
+        <div class="control-header">Contrast <span class="val" id="contrast-val">0</span></div>
+        <input type="range" id="contrast" min="-100" max="100" value="0" step="1">
+      </div>
+      <div class="control-row">
+        <div class="control-header">Gamma <span class="val" id="gamma-val">1.00</span></div>
+        <input type="range" id="gamma" min="0.2" max="3.0" value="1.0" step="0.05">
+      </div>
+      <div class="control-row">
+        <div class="control-header">Sharpen <span class="val" id="sharpen-val">0</span></div>
+        <input type="range" id="sharpen" min="0" max="10" value="0" step="0.5">
+      </div>
+      <div class="control-row" style="margin-top:0.5rem">
+        <div class="control-header" style="margin-bottom:6px">Dithering</div>
+        <select id="dither">
+          <option value="none">None — hard threshold</option>
+          <option value="ordered">Ordered (Bayer 4×4) — regular texture</option>
+          <option value="fs">Floyd-Steinberg — smooth gradients</option>
+          <option value="atkinson">Atkinson — crisp with open midtones</option>
+        </select>
+        <p class="hint">Dithering only applies in Foreground fill mode.</p>
+      </div>
+    </div>
+
+    <!-- CHARACTER SET -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">Character set</div>
+      <div class="charset-grid">
+        <button class="cs-btn active" data-cs="foreground_only"><span class="cs-name">Foreground fill</span><span class="cs-preview"> ████</span></button>
+        <button class="cs-btn" data-cs="detailed"><span class="cs-name">Detailed ramp</span><span class="cs-preview"> .:-=+*#%@</span></button>
+        <button class="cs-btn" data-cs="dots"><span class="cs-name">Dots</span><span class="cs-preview"> .·•●</span></button>
+        <button class="cs-btn" data-cs="crosses"><span class="cs-name">Crosses</span><span class="cs-preview"> +x✕✖</span></button>
+        <button class="cs-btn" data-cs="lines"><span class="cs-name">Lines</span><span class="cs-preview"> -–—=≡</span></button>
+        <button class="cs-btn" data-cs="geometric"><span class="cs-name">Geometric</span><span class="cs-preview"> ▪▫◆◇◉</span></button>
+        <button class="cs-btn" data-cs="numbers"><span class="cs-name">Numbers</span><span class="cs-preview"> 1234567890</span></button>
+        <button class="cs-btn" data-cs="braille"><span class="cs-name">Braille</span><span class="cs-preview"> ⠁⠃⠇⠏⠿</span></button>
+        <button class="cs-btn" data-cs="stipple"><span class="cs-name">Stipple</span><span class="cs-preview"> ·∶⁚⁛▓</span></button>
+        <button class="cs-btn" data-cs="custom"><span class="cs-name">Custom…</span><span class="cs-preview">define your own</span></button>
+      </div>
+      <div id="custom-chars-wrap">
+        <input type="text" id="custom-chars" placeholder="space first, then light → dark chars">
+        <p class="hint">Start with a space. Order lightest to darkest.</p>
+      </div>
+
+      <div id="threshold-section" style="margin-top:0.75rem">
+        <div class="control-header">Threshold <span class="val" id="threshold-val">50%</span></div>
+        <input type="range" id="threshold" min="0" max="100" value="50" step="1">
+        <div class="threshold-labels"><span>all white</span><span>all filled</span></div>
+      </div>
+
+      <div id="fg-char-section" style="margin-top:0.75rem">
+        <div class="control-header" style="margin-bottom:6px">Fill character</div>
+        <div class="charset-grid" id="fg-char-grid">
+          <button class="fg-btn active" data-ch="#"># hash</button>
+          <button class="fg-btn" data-ch="@">@ at</button>
+          <button class="fg-btn" data-ch="*">* asterisk</button>
+          <button class="fg-btn" data-ch="+">+ plus</button>
+          <button class="fg-btn" data-ch="X">X cross</button>
+          <button class="fg-btn" data-ch="O">O circle</button>
+          <button class="fg-btn" data-ch="█">█ block</button>
+          <button class="fg-btn" data-ch="•">• bullet</button>
+        </div>
+        <input type="text" id="fg-custom-char" placeholder="or type any character" maxlength="1" style="margin-top:6px">
+      </div>
+    </div>
+
+    <!-- TONE -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">Tone</div>
+      <div class="toggle-row">Invert image <label class="toggle"><input type="checkbox" id="invert"><span class="toggle-track"></span></label></div>
+      <div class="toggle-row">Dark background preview <label class="toggle"><input type="checkbox" id="dark-bg"><span class="toggle-track"></span></label></div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">Preview font size</div>
+      <div class="control-row">
+        <div class="control-header">Size <span class="val" id="fontsize-val">10px</span></div>
+        <input type="range" id="fontsize" min="3" max="24" value="10" step="1">
+      </div>
+    </div>
+
+    <!-- DXF OUTPUT -->
+    <div class="panel-section">
+      <div class="section-label" style="margin-bottom:0.75rem">DXF output</div>
+      <div class="control-row">
+        <div class="control-header">Character height (mm) <span class="val" id="charheight-val">3.0</span></div>
+        <input type="range" id="charheight" min="0.5" max="20" value="3" step="0.5">
+      </div>
+      <div class="control-row">
+        <div class="control-header">Char width ratio <span class="val" id="charratio-val">0.55</span></div>
+        <input type="range" id="charratio" min="0.3" max="1.0" value="0.55" step="0.01">
+      </div>
+      <div class="control-row" style="margin-top:0.6rem">
+        <div class="control-header" style="margin-bottom:6px">Layer name</div>
+        <input type="text" id="layer-name" value="ASCII">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="export-btn" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export .dxf
+    </button>
+
+  </div><!-- /left panel -->
+
+  <!-- ── RIGHT COLUMN ── -->
+  <div class="right-col">
+
+    <!-- Image preview + histogram -->
+    <div class="img-panel" id="img-panel" style="display:none">
+      <div class="img-panel-header">
+        <div class="section-label">Image preview</div>
+        <div class="view-tabs">
+          <button class="view-tab active" data-view="both">Both</button>
+          <button class="view-tab" data-view="original">Original</button>
+          <button class="view-tab" data-view="adjusted">Adjusted</button>
+        </div>
+      </div>
+      <div class="img-preview-row" id="img-preview-row">
+        <div class="img-preview-wrap" id="wrap-original">
+          <div class="img-preview-label">Original</div>
+          <canvas id="preview-original"></canvas>
+        </div>
+        <div class="img-preview-wrap" id="wrap-adjusted">
+          <div class="img-preview-label">Adjusted (what gets converted)</div>
+          <canvas id="preview-adjusted"></canvas>
+        </div>
+      </div>
+      <div class="histogram-wrap">
+        <div class="histogram-label">
+          <span>Tonal histogram</span>
+          <span id="histogram-note" style="color:#bbb; font-size:10px"></span>
+        </div>
+        <canvas id="histogram-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- ASCII output -->
+    <div class="preview-area" id="preview-area">
+      <div class="placeholder">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <p>Upload an image to begin</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" id="stats" style="display:none">
+      <div class="stat"><div class="v" id="stat-cols">—</div><div class="l">columns</div></div>
+      <div class="stat"><div class="v" id="stat-rows">—</div><div class="l">rows</div></div>
+      <div class="stat"><div class="v" id="stat-chars">—</div><div class="l">placed chars</div></div>
+      <div class="stat"><div class="v" id="stat-size">—</div><div class="l">width (mm)</div></div>
+    </div>
+
+  </div><!-- /right col -->
+</div><!-- /app -->
+
+<script>
+// ── Character sets ──────────────────────────────────────────────────────────
+const CHARSETS = {
+  foreground_only: null,
+  detailed:   " .`'^\",:;Il!i><~+_-?][}{1)(|\\\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  dots:       " .\u00b7\u2022\u25cf",
+  crosses:    " +x\u2715\u2716",
+  lines:      " -\u2013\u2014=\u2261",
+  geometric:  " \u25aa\u25ab\u25c6\u25c7\u25c9",
+  numbers:    " 1234567890",
+  braille:    " \u2801\u2803\u2807\u280f\u283f",
+  stipple:    " \u00b7\u2056\u205a\u205b\u2593",
+};
+
+// Bayer 4x4 matrix (normalised 0-1)
+const BAYER4 = [
+  [ 0/16,  8/16,  2/16, 10/16],
+  [12/16,  4/16, 14/16,  6/16],
+  [ 3/16, 11/16,  1/16,  9/16],
+  [15/16,  7/16, 13/16,  5/16]
+];
+
+let currentImage = null;
+let asciiLines = [];
+let currentCharset = 'foreground_only';
+let fgChar = '#';
+let previewView = 'both'; // 'both' | 'original' | 'adjusted'
+
+// ── Sharpening (unsharp mask on greyscale float array) ───────────────────────
+function sharpenData(grey, w, h, amount) {
+  if (amount <= 0) return grey;
+  // Gaussian blur (radius 1) then unsharp mask
+  const blurred = new Float32Array(w * h);
+  const kernel = [1,2,1, 2,4,2, 1,2,1];
+  const ksum = 16;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let s = 0, wt = 0;
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const ny = y + ky, nx = x + kx;
+          if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+            const k = kernel[(ky+1)*3 + (kx+1)];
+            s += grey[ny*w + nx] * k;
+            wt += k;
+          }
+        }
+      }
+      blurred[y*w + x] = s / wt;
+    }
+  }
+  const out = new Float32Array(w * h);
+  const scale = amount / 5; // amount 0-10 → scale 0-2
+  for (let i = 0; i < w*h; i++) {
+    out[i] = Math.min(1, Math.max(0, grey[i] + scale * (grey[i] - blurred[i])));
+  }
+  return out;
+}
+
+// ── Image adjustment on a single luminance value ─────────────────────────────
+function adjustLum(lum) {
+  const brightness = parseInt(document.getElementById('brightness').value) / 100;
+  const contrast   = parseInt(document.getElementById('contrast').value) / 100;
+  const gamma      = parseFloat(document.getElementById('gamma').value);
+  let v = Math.pow(Math.max(0, lum), gamma);
+  v = (v - 0.5) * (1 + contrast) + 0.5;
+  v = v + brightness;
+  return Math.min(1, Math.max(0, v));
+}
+
+// ── Extract and adjust greyscale from image ──────────────────────────────────
+function getAdjustedGrey(img, cols) {
+  const aspectCorr = parseFloat(document.getElementById('aspect').value);
+  const rows = Math.max(1, Math.round(cols * (img.height / img.width) * aspectCorr));
+  const canvas = document.getElementById('hidden-canvas');
+  canvas.width = cols; canvas.height = rows;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, cols, rows);
+  const data = ctx.getImageData(0, 0, cols, rows).data;
+  const invert = document.getElementById('invert').checked;
+
+  // Raw grey
+  let grey = new Float32Array(cols * rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
+    grey[i] = (0.299*r + 0.587*g + 0.114*b) / 255;
+  }
+
+  // Sharpening before other adjustments
+  const sharpAmt = parseFloat(document.getElementById('sharpen').value);
+  grey = sharpenData(grey, cols, rows, sharpAmt);
+
+  // Brightness / contrast / gamma + invert
+  for (let i = 0; i < cols * rows; i++) {
+    let v = adjustLum(grey[i]);
+    if (invert) v = 1 - v;
+    grey[i] = v;
+  }
+  return { grey, cols, rows };
+}
+
+// ── Dithering ─────────────────────────────────────────────────────────────────
+function applyDither(grey, cols, rows, threshold) {
+  const method = document.getElementById('dither').value;
+  const result = new Uint8Array(cols * rows); // 1 = filled, 0 = empty
+  const t = threshold; // 0-1
+
+  if (method === 'none') {
+    for (let i = 0; i < cols * rows; i++) {
+      result[i] = (1 - grey[i]) >= t ? 1 : 0;
+    }
+    return result;
+  }
+
+  if (method === 'ordered') {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const noise = BAYER4[r % 4][c % 4] - 0.5; // -0.5..+0.5
+        const darkness = 1 - grey[i];
+        result[i] = (darkness + noise * 0.9) >= t ? 1 : 0;
+      }
+    }
+    return result;
+  }
+
+  if (method === 'fs') {
+    // Floyd-Steinberg: work on a copy
+    const g = new Float32Array(grey); // already 0=white 1=black conceptually? No: grey=luminance (1=white)
+    // We dither "darkness" = 1 - lum
+    const dark = new Float32Array(cols * rows);
+    for (let i = 0; i < cols * rows; i++) dark[i] = 1 - g[i];
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const old = dark[i];
+        const nw = old >= t ? 1.0 : 0.0;
+        result[i] = nw;
+        const err = old - nw;
+        if (c + 1 < cols)            dark[i + 1]         += err * 7/16;
+        if (r + 1 < rows) {
+          if (c - 1 >= 0)            dark[i + cols - 1]  += err * 3/16;
+                                     dark[i + cols]       += err * 5/16;
+          if (c + 1 < cols)          dark[i + cols + 1]  += err * 1/16;
+        }
+      }
+    }
+    return result;
+  }
+
+  if (method === 'atkinson') {
+    const dark = new Float32Array(cols * rows);
+    for (let i = 0; i < cols * rows; i++) dark[i] = 1 - grey[i];
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const old = dark[i];
+        const nw = old >= t ? 1.0 : 0.0;
+        result[i] = nw;
+        const err = (old - nw) / 8;
+        const spread = [
+          [0,1],[0,2],[1,-1],[1,0],[1,1],[2,0]
+        ];
+        for (const [dr, dc] of spread) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+            dark[nr * cols + nc] += err;
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  return result;
+}
+
+// ── Main ASCII conversion ────────────────────────────────────────────���────────
+function imageToAscii(img) {
+  const cols = parseInt(document.getElementById('cols').value);
+  const { grey, rows } = getAdjustedGrey(img, cols);
+  const threshold = parseInt(document.getElementById('threshold').value) / 100;
+  const isFg = currentCharset === 'foreground_only';
+  const fillChar = getActiveFgChar();
+
+  const charset = isFg ? null : (
+    currentCharset === 'custom'
+      ? (document.getElementById('custom-chars').value.trim() || CHARSETS.detailed)
+      : CHARSETS[currentCharset]
+  );
+
+  let dithered = null;
+  if (isFg) {
+    dithered = applyDither(grey, cols, rows, threshold);
+  }
+
+  let placedCount = 0;
+  const lines = [];
+  for (let r = 0; r < rows; r++) {
+    let line = '';
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      let ch;
+      if (isFg) {
+        ch = dithered[i] ? fillChar : ' ';
+      } else {
+        const mapped = 1 - grey[i];
+        const idx = Math.min(charset.length - 1, Math.floor(mapped * charset.length));
+        ch = charset[idx];
+      }
+      if (ch !== ' ') placedCount++;
+      line += ch;
+    }
+    lines.push(line);
+  }
+  return { lines, cols, rows, placedCount, grey };
+}
+
+function getActiveFgChar() {
+  const custom = document.getElementById('fg-custom-char').value;
+  return custom.length === 1 ? custom : fgChar;
+}
+
+// ── Image preview panels ──────────────────────────────────────────────────────
+function updateImagePreviews() {
+  if (!currentImage) return;
+  const cols = parseInt(document.getElementById('cols').value);
+  const { grey, rows } = getAdjustedGrey(currentImage, cols);
+
+  const W = 200, H = Math.round(W * (rows / cols));
+
+  // Original
+  const co = document.getElementById('preview-original');
+  co.width = W; co.height = H;
+  const ctxO = co.getContext('2d');
+  // Draw original image greyscale (without adjustments) at W×H
+  const tmpC = document.createElement('canvas');
+  tmpC.width = cols; tmpC.height = rows;
+  const tmpCtx = tmpC.getContext('2d');
+  tmpCtx.drawImage(currentImage, 0, 0, cols, rows);
+  const rawData = tmpCtx.getImageData(0, 0, cols, rows).data;
+  const origImg = ctxO.createImageData(cols, rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const r = rawData[i*4], g = rawData[i*4+1], b = rawData[i*4+2];
+    const l = Math.round(0.299*r + 0.587*g + 0.114*b);
+    origImg.data[i*4] = origImg.data[i*4+1] = origImg.data[i*4+2] = l;
+    origImg.data[i*4+3] = 255;
+  }
+  // Put at native then scale
+  const tmpC2 = document.createElement('canvas');
+  tmpC2.width = cols; tmpC2.height = rows;
+  tmpC2.getContext('2d').putImageData(origImg, 0, 0);
+  ctxO.drawImage(tmpC2, 0, 0, W, H);
+
+  // Adjusted
+  const ca = document.getElementById('preview-adjusted');
+  ca.width = W; ca.height = H;
+  const ctxA = ca.getContext('2d');
+  const adjImg = ctxA.createImageData(cols, rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const v = Math.round(grey[i] * 255);
+    adjImg.data[i*4] = adjImg.data[i*4+1] = adjImg.data[i*4+2] = v;
+    adjImg.data[i*4+3] = 255;
+  }
+  const tmpC3 = document.createElement('canvas');
+  tmpC3.width = cols; tmpC3.height = rows;
+  tmpC3.getContext('2d').putImageData(adjImg, 0, 0);
+  ctxA.drawImage(tmpC3, 0, 0, W, H);
+
+  // Histogram
+  updateHistogram(grey, cols, rows);
+
+  // Show/hide based on view
+  const wO = document.getElementById('wrap-original');
+  const wA = document.getElementById('wrap-adjusted');
+  if (previewView === 'both') {
+    wO.style.display = ''; wA.style.display = '';
+    document.getElementById('img-preview-row').style.gridTemplateColumns = '1fr 1fr';
+  } else if (previewView === 'original') {
+    wO.style.display = ''; wA.style.display = 'none';
+    document.getElementById('img-preview-row').style.gridTemplateColumns = '1fr';
+  } else {
+    wO.style.display = 'none'; wA.style.display = '';
+    document.getElementById('img-preview-row').style.gridTemplateColumns = '1fr';
+  }
+
+  document.getElementById('img-panel').style.display = 'block';
+}
+
+function updateHistogram(grey, cols, rows) {
+  const bins = 64;
+  const counts = new Array(bins).fill(0);
+  for (let i = 0; i < grey.length; i++) {
+    const b = Math.min(bins - 1, Math.floor(grey[i] * bins));
+    counts[b]++;
+  }
+  const maxCount = Math.max(...counts);
+
+  const canvas = document.getElementById('histogram-canvas');
+  const W = canvas.offsetWidth || 400;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = 60 * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, W, 60);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, '#111');
+  grad.addColorStop(1, '#eee');
+
+  const bw = W / bins;
+  for (let i = 0; i < bins; i++) {
+    const h = maxCount > 0 ? (counts[i] / maxCount) * 52 : 0;
+    ctx.fillStyle = grad;
+    ctx.fillRect(i * bw, 60 - h, bw - 0.5, h);
+  }
+
+  // Threshold line (only in fg mode)
+  if (currentCharset === 'foreground_only') {
+    const threshold = parseInt(document.getElementById('threshold').value) / 100;
+    // threshold = darkness threshold; maps to luminance at (1 - threshold)
+    const lumAtThresh = 1 - threshold;
+    const tx = lumAtThresh * W;
+    ctx.strokeStyle = '#e44';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, 60); ctx.stroke();
+    ctx.setLineDash([]);
+    document.getElementById('histogram-note').textContent = `threshold at ${Math.round(lumAtThresh*100)}% luminance`;
+  } else {
+    document.getElementById('histogram-note').textContent = '';
+  }
+}
+
+// ── Render ASCII preview ──────────────────────────────────────────────────────
+function render() {
+  if (!currentImage) return;
+
+  // Update image previews
+  updateImagePreviews();
+
+  const result = imageToAscii(currentImage);
+  asciiLines = result.lines;
+
+  const area = document.getElementById('preview-area');
+  const fs = parseInt(document.getElementById('fontsize').value);
+
+  let wrap = document.getElementById('ascii-scale-wrap');
+  let pre  = document.getElementById('ascii-output');
+  if (!wrap) {
+    area.innerHTML = '';
+    wrap = document.createElement('div');
+    wrap.id = 'ascii-scale-wrap';
+    pre = document.createElement('pre');
+    pre.id = 'ascii-output';
+    wrap.appendChild(pre);
+    area.appendChild(wrap);
+  }
+
+  pre.style.fontSize = fs + 'px';
+  pre.textContent = result.lines.join('\n');
+
+  requestAnimationFrame(() => {
+    wrap.style.transform = 'scale(1)';
+    const areaW = area.clientWidth - 32;
+    const areaH = area.clientHeight - 32;
+    const preW  = pre.scrollWidth;
+    const preH  = pre.scrollHeight;
+    if (preW > 0 && preH > 0) {
+      const scale = Math.min(areaW / preW, areaH / preH, 1);
+      wrap.style.transform = `scale(${scale})`;
+    }
+  });
+
+  const charH = parseFloat(document.getElementById('charheight').value);
+  const charRatio = parseFloat(document.getElementById('charratio').value);
+  document.getElementById('stat-cols').textContent = result.cols;
+  document.getElementById('stat-rows').textContent = result.rows;
+  document.getElementById('stat-chars').textContent = result.placedCount.toLocaleString();
+  document.getElementById('stat-size').textContent = Math.round(result.cols * charH * charRatio);
+  document.getElementById('stats').style.display = 'grid';
+  document.getElementById('export-btn').disabled = false;
+}
+
+// ── Build DXF ─────────────────────────────────────────────────────────────────
+function buildDXF() {
+  const charH = parseFloat(document.getElementById('charheight').value);
+  const charW = charH * parseFloat(document.getElementById('charratio').value);
+  const layer = (document.getElementById('layer-name').value || 'ASCII').replace(/[^A-Za-z0-9_\-]/g, '_');
+  const rows = asciiLines.length;
+
+  let dxf = '0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n';
+  dxf += '0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n';
+  dxf += '0\nLAYER\n2\n' + layer + '\n70\n0\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n';
+  dxf += '0\nSECTION\n2\nENTITIES\n';
+
+  for (let r = 0; r < rows; r++) {
+    const line = asciiLines[r];
+    const y = ((rows - r - 1) * charH).toFixed(6);
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === ' ') continue;
+      const x = (c * charW).toFixed(6);
+      dxf += '0\nTEXT\n8\n' + layer + '\n10\n' + x + '\n20\n' + y + '\n30\n0.0\n40\n' + charH.toFixed(6) + '\n1\n' + ch + '\n';
+    }
+  }
+  dxf += '0\nENDSEC\n0\nEOF\n';
+  return dxf;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function fitPreview() {
+  const wrap = document.getElementById('ascii-scale-wrap');
+  const pre  = document.getElementById('ascii-output');
+  const area = document.getElementById('preview-area');
+  if (!wrap || !pre) return;
+  wrap.style.transform = 'scale(1)';
+  const scale = Math.min((area.clientWidth - 32) / pre.scrollWidth, (area.clientHeight - 32) / pre.scrollHeight, 1);
+  wrap.style.transform = `scale(${scale})`;
+}
+
+function bindSlider(id, suffix, decimals) {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(id + '-val');
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if (valEl) valEl.textContent = (decimals > 0 ? v.toFixed(decimals) : v) + (suffix || '');
+    render();
+  });
+}
+
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => { currentImage = img; render(); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (!asciiLines.length) return;
+  const blob = new Blob([buildDXF()], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ascii_output.dxf';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+document.getElementById('file-input').addEventListener('change', e => loadFile(e.target.files[0]));
+
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#888'; });
+zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+zone.addEventListener('drop', e => { e.preventDefault(); zone.style.borderColor = ''; loadFile(e.dataTransfer.files[0]); });
+
+document.querySelectorAll('.cs-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cs-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCharset = btn.dataset.cs;
+    const isFg = currentCharset === 'foreground_only';
+    document.getElementById('threshold-section').style.display = isFg ? 'block' : 'none';
+    document.getElementById('fg-char-section').style.display   = isFg ? 'block' : 'none';
+    document.getElementById('custom-chars-wrap').style.display = currentCharset === 'custom' ? 'block' : 'none';
+    render();
+  });
+});
+
+document.querySelectorAll('.fg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    fgChar = btn.dataset.ch;
+    document.getElementById('fg-custom-char').value = '';
+    render();
+  });
+});
+document.getElementById('fg-custom-char').addEventListener('input', function() {
+  if (this.value.length === 1) document.querySelectorAll('.fg-btn').forEach(b => b.classList.remove('active'));
+  render();
+});
+
+document.querySelectorAll('.view-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    previewView = btn.dataset.view;
+    updateImagePreviews();
+  });
+});
+
+document.getElementById('dark-bg').addEventListener('change', function() {
+  document.getElementById('preview-area').classList.toggle('dark-bg', this.checked);
+});
+
+document.getElementById('reset-adjustments').addEventListener('click', () => {
+  const defs = { brightness: [0,'',0], contrast: [0,'',0], gamma: [1.0,'',2], sharpen: [0,'',0] };
+  for (const [id, [val, suffix, dec]] of Object.entries(defs)) {
+    document.getElementById(id).value = val;
+    const ve = document.getElementById(id+'-val');
+    if (ve) ve.textContent = dec > 0 ? val.toFixed(dec) : val;
+  }
+  document.getElementById('dither').value = 'none';
+  render();
+});
+
+bindSlider('cols',       '',   0);
+bindSlider('aspect',     '',   2);
+bindSlider('brightness', '',   0);
+bindSlider('contrast',   '',   0);
+bindSlider('gamma',      '',   2);
+bindSlider('sharpen',    '',   1);
+bindSlider('fontsize',   'px', 0);
+bindSlider('threshold',  '%',  0);
+bindSlider('charheight', '',   1);
+bindSlider('charratio',  '',   2);
+
+document.getElementById('invert').addEventListener('change', render);
+document.getElementById('custom-chars').addEventListener('input', render);
+document.getElementById('dither').addEventListener('change', render);
+window.addEventListener('resize', fitPreview);
+
+// Init UI state
+document.getElementById('threshold-section').style.display = 'block';
+document.getElementById('fg-char-section').style.display   = 'block';
+document.getElementById('custom-chars-wrap').style.display  = 'none';
+</script>
+</body>
+</html>
