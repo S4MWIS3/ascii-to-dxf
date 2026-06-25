@@ -66,6 +66,9 @@
   .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
   .btn-primary:hover { background: #333; }
   .btn-primary:disabled:hover { background: #1a1a1a; }
+  
+  .btn-group-half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .btn-group-half .btn { margin-bottom: 0; }
 
   .reset-btn { font-size: 11px; color: #999; background: none; border: 1px solid #e0ddd8; border-radius: 5px; padding: 3px 8px; cursor: pointer; transition: all 0.12s; }
   .reset-btn:hover { border-color: #aaa; color: #555; background: #faf9f7; }
@@ -94,11 +97,11 @@
   .histogram-label { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; display: flex; justify-content: space-between; }
   #histogram-canvas { width: 100%; height: 60px; border-radius: 6px; display: block; background: #f5f4f0; }
 
-  /* ASCII preview */
+  /* ASCII preview area (optimized via text wrapping restriction) */
   .preview-area { background: #fff; border: 1px solid #e5e3de; border-radius: 10px; height: 520px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
   .preview-area.dark-bg { background: #111; }
-  #ascii-scale-wrap { transform-origin: center center; }
-  #ascii-output { font-family: 'Courier New', Courier, monospace; white-space: pre; line-height: 1; padding: 0; font-size: 10px; color: #1a1a1a; display: block; }
+  #ascii-scale-wrap { transform-origin: center center; max-width: 100%; max-height: 100%; }
+  #ascii-output { font-family: 'Courier New', Courier, monospace; white-space: pre; line-height: 1; padding: 0; font-size: 10px; color: #1a1a1a; display: block; overflow: hidden; }
   .dark-bg #ascii-output { color: #fff; }
 
   .placeholder { text-align: center; color: #ccc; user-select: none; }
@@ -117,10 +120,8 @@
 <h1>ASCII → DXF</h1>
 
 <div class="app">
-  <!-- ── LEFT PANEL ── -->
   <div class="panel">
 
-    <!-- IMAGE UPLOAD -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">Image</div>
       <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
@@ -133,12 +134,11 @@
       <canvas id="hidden-canvas" style="display:none"></canvas>
     </div>
 
-    <!-- RESOLUTION -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">Resolution</div>
       <div class="control-row">
         <div class="control-header">Columns <span class="val" id="cols-val">80</span></div>
-        <input type="range" id="cols" min="20" max="400" value="80" step="1">
+        <input type="range" id="cols" min="20" max="3000" value="80" step="1">
       </div>
       <div class="control-row">
         <div class="control-header">Aspect correction <span class="val" id="aspect-val">0.45</span></div>
@@ -146,7 +146,6 @@
       </div>
     </div>
 
-    <!-- IMAGE ADJUSTMENTS -->
     <div class="panel-section">
       <div class="section-header">
         <div class="section-label">Image adjustments</div>
@@ -181,7 +180,6 @@
       </div>
     </div>
 
-    <!-- CHARACTER SET -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">Character set</div>
       <div class="charset-grid">
@@ -223,28 +221,25 @@
       </div>
     </div>
 
-    <!-- TONE -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">Tone</div>
       <div class="toggle-row">Invert image <label class="toggle"><input type="checkbox" id="invert"><span class="toggle-track"></span></label></div>
       <div class="toggle-row">Dark background preview <label class="toggle"><input type="checkbox" id="dark-bg"><span class="toggle-track"></span></label></div>
     </div>
 
-    <!-- PREVIEW -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">Preview font size</div>
       <div class="control-row">
         <div class="control-header">Size <span class="val" id="fontsize-val">10px</span></div>
-        <input type="range" id="fontsize" min="3" max="24" value="10" step="1">
+        <input type="range" id="fontsize" min="1" max="24" value="10" step="1">
       </div>
     </div>
 
-    <!-- DXF OUTPUT -->
     <div class="panel-section">
       <div class="section-label" style="margin-bottom:0.75rem">DXF output</div>
       <div class="control-row">
         <div class="control-header">Character height (mm) <span class="val" id="charheight-val">3.0</span></div>
-        <input type="range" id="charheight" min="0.5" max="20" value="3" step="0.5">
+        <input type="range" id="charheight" min="0.1" max="20" value="3" step="0.1">
       </div>
       <div class="control-row">
         <div class="control-header">Char width ratio <span class="val" id="charratio-val">0.55</span></div>
@@ -256,17 +251,24 @@
       </div>
     </div>
 
+    <div class="btn-group-half">
+      <button class="btn" id="copy-btn" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy Text
+      </button>
+      <button class="btn" id="txt-btn" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Save .txt
+      </button>
+    </div>
+
     <button class="btn btn-primary" id="export-btn" disabled>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Export .dxf
     </button>
 
-  </div><!-- /left panel -->
+  </div><div class="right-col">
 
-  <!-- ── RIGHT COLUMN ── -->
-  <div class="right-col">
-
-    <!-- Image preview + histogram -->
     <div class="img-panel" id="img-panel" style="display:none">
       <div class="img-panel-header">
         <div class="section-label">Image preview</div>
@@ -295,7 +297,6 @@
       </div>
     </div>
 
-    <!-- ASCII output -->
     <div class="preview-area" id="preview-area">
       <div class="placeholder">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
@@ -305,7 +306,6 @@
       </div>
     </div>
 
-    <!-- Stats -->
     <div class="stats" id="stats" style="display:none">
       <div class="stat"><div class="v" id="stat-cols">—</div><div class="l">columns</div></div>
       <div class="stat"><div class="v" id="stat-rows">—</div><div class="l">rows</div></div>
@@ -313,10 +313,7 @@
       <div class="stat"><div class="v" id="stat-size">—</div><div class="l">width (mm)</div></div>
     </div>
 
-  </div><!-- /right col -->
-</div><!-- /app -->
-
-<script>
+  </div></div><script>
 // ── Character sets ──────────────────────────────────────────────────────────
 const CHARSETS = {
   foreground_only: null,
@@ -330,7 +327,6 @@ const CHARSETS = {
   stipple:    " \u00b7\u2056\u205a\u205b\u2593",
 };
 
-// Bayer 4x4 matrix (normalised 0-1)
 const BAYER4 = [
   [ 0/16,  8/16,  2/16, 10/16],
   [12/16,  4/16, 14/16,  6/16],
@@ -342,12 +338,10 @@ let currentImage = null;
 let asciiLines = [];
 let currentCharset = 'foreground_only';
 let fgChar = '#';
-let previewView = 'both'; // 'both' | 'original' | 'adjusted'
+let previewView = 'both';
 
-// ── Sharpening (unsharp mask on greyscale float array) ───────────────────────
 function sharpenData(grey, w, h, amount) {
   if (amount <= 0) return grey;
-  // Gaussian blur (radius 1) then unsharp mask
   const blurred = new Float32Array(w * h);
   const kernel = [1,2,1, 2,4,2, 1,2,1];
   const ksum = 16;
@@ -368,14 +362,13 @@ function sharpenData(grey, w, h, amount) {
     }
   }
   const out = new Float32Array(w * h);
-  const scale = amount / 5; // amount 0-10 → scale 0-2
+  const scale = amount / 5;
   for (let i = 0; i < w*h; i++) {
     out[i] = Math.min(1, Math.max(0, grey[i] + scale * (grey[i] - blurred[i])));
   }
   return out;
 }
 
-// ── Image adjustment on a single luminance value ─────────────────────────────
 function adjustLum(lum) {
   const brightness = parseInt(document.getElementById('brightness').value) / 100;
   const contrast   = parseInt(document.getElementById('contrast').value) / 100;
@@ -386,7 +379,6 @@ function adjustLum(lum) {
   return Math.min(1, Math.max(0, v));
 }
 
-// ── Extract and adjust greyscale from image ──────────────────────────────────
 function getAdjustedGrey(img, cols) {
   const aspectCorr = parseFloat(document.getElementById('aspect').value);
   const rows = Math.max(1, Math.round(cols * (img.height / img.width) * aspectCorr));
@@ -397,18 +389,15 @@ function getAdjustedGrey(img, cols) {
   const data = ctx.getImageData(0, 0, cols, rows).data;
   const invert = document.getElementById('invert').checked;
 
-  // Raw grey
   let grey = new Float32Array(cols * rows);
   for (let i = 0; i < cols * rows; i++) {
     const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
     grey[i] = (0.299*r + 0.587*g + 0.114*b) / 255;
   }
 
-  // Sharpening before other adjustments
   const sharpAmt = parseFloat(document.getElementById('sharpen').value);
   grey = sharpenData(grey, cols, rows, sharpAmt);
 
-  // Brightness / contrast / gamma + invert
   for (let i = 0; i < cols * rows; i++) {
     let v = adjustLum(grey[i]);
     if (invert) v = 1 - v;
@@ -417,11 +406,10 @@ function getAdjustedGrey(img, cols) {
   return { grey, cols, rows };
 }
 
-// ── Dithering ─────────────────────────────────────────────────────────────────
 function applyDither(grey, cols, rows, threshold) {
   const method = document.getElementById('dither').value;
-  const result = new Uint8Array(cols * rows); // 1 = filled, 0 = empty
-  const t = threshold; // 0-1
+  const result = new Uint8Array(cols * rows);
+  const t = threshold;
 
   if (method === 'none') {
     for (let i = 0; i < cols * rows; i++) {
@@ -434,7 +422,7 @@ function applyDither(grey, cols, rows, threshold) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
-        const noise = BAYER4[r % 4][c % 4] - 0.5; // -0.5..+0.5
+        const noise = BAYER4[r % 4][c % 4] - 0.5;
         const darkness = 1 - grey[i];
         result[i] = (darkness + noise * 0.9) >= t ? 1 : 0;
       }
@@ -443,9 +431,7 @@ function applyDither(grey, cols, rows, threshold) {
   }
 
   if (method === 'fs') {
-    // Floyd-Steinberg: work on a copy
-    const g = new Float32Array(grey); // already 0=white 1=black conceptually? No: grey=luminance (1=white)
-    // We dither "darkness" = 1 - lum
+    const g = new Float32Array(grey);
     const dark = new Float32Array(cols * rows);
     for (let i = 0; i < cols * rows; i++) dark[i] = 1 - g[i];
 
@@ -478,9 +464,7 @@ function applyDither(grey, cols, rows, threshold) {
         const nw = old >= t ? 1.0 : 0.0;
         result[i] = nw;
         const err = (old - nw) / 8;
-        const spread = [
-          [0,1],[0,2],[1,-1],[1,0],[1,1],[2,0]
-        ];
+        const spread = [[0,1],[0,2],[1,-1],[1,0],[1,1],[2,0]];
         for (const [dr, dc] of spread) {
           const nr = r + dr, nc = c + dc;
           if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
@@ -491,11 +475,9 @@ function applyDither(grey, cols, rows, threshold) {
     }
     return result;
   }
-
   return result;
 }
 
-// ── Main ASCII conversion ────────────────────────────────────────────���────────
 function imageToAscii(img) {
   const cols = parseInt(document.getElementById('cols').value);
   const { grey, rows } = getAdjustedGrey(img, cols);
@@ -541,19 +523,16 @@ function getActiveFgChar() {
   return custom.length === 1 ? custom : fgChar;
 }
 
-// ── Image preview panels ──────────────────────────────────────────────────────
 function updateImagePreviews() {
   if (!currentImage) return;
-  const cols = parseInt(document.getElementById('cols').value);
+  const cols = Math.min(parseInt(document.getElementById('cols').value), 400); // Limit preview processing to stay snappy
   const { grey, rows } = getAdjustedGrey(currentImage, cols);
 
   const W = 200, H = Math.round(W * (rows / cols));
 
-  // Original
   const co = document.getElementById('preview-original');
   co.width = W; co.height = H;
   const ctxO = co.getContext('2d');
-  // Draw original image greyscale (without adjustments) at W×H
   const tmpC = document.createElement('canvas');
   tmpC.width = cols; tmpC.height = rows;
   const tmpCtx = tmpC.getContext('2d');
@@ -566,13 +545,11 @@ function updateImagePreviews() {
     origImg.data[i*4] = origImg.data[i*4+1] = origImg.data[i*4+2] = l;
     origImg.data[i*4+3] = 255;
   }
-  // Put at native then scale
   const tmpC2 = document.createElement('canvas');
   tmpC2.width = cols; tmpC2.height = rows;
   tmpC2.getContext('2d').putImageData(origImg, 0, 0);
   ctxO.drawImage(tmpC2, 0, 0, W, H);
 
-  // Adjusted
   const ca = document.getElementById('preview-adjusted');
   ca.width = W; ca.height = H;
   const ctxA = ca.getContext('2d');
@@ -587,10 +564,8 @@ function updateImagePreviews() {
   tmpC3.getContext('2d').putImageData(adjImg, 0, 0);
   ctxA.drawImage(tmpC3, 0, 0, W, H);
 
-  // Histogram
   updateHistogram(grey, cols, rows);
 
-  // Show/hide based on view
   const wO = document.getElementById('wrap-original');
   const wA = document.getElementById('wrap-adjusted');
   if (previewView === 'both') {
@@ -624,7 +599,6 @@ function updateHistogram(grey, cols, rows) {
   ctx.scale(devicePixelRatio, devicePixelRatio);
   ctx.clearRect(0, 0, W, 60);
 
-  // Gradient fill
   const grad = ctx.createLinearGradient(0, 0, W, 0);
   grad.addColorStop(0, '#111');
   grad.addColorStop(1, '#eee');
@@ -636,10 +610,8 @@ function updateHistogram(grey, cols, rows) {
     ctx.fillRect(i * bw, 60 - h, bw - 0.5, h);
   }
 
-  // Threshold line (only in fg mode)
   if (currentCharset === 'foreground_only') {
     const threshold = parseInt(document.getElementById('threshold').value) / 100;
-    // threshold = darkness threshold; maps to luminance at (1 - threshold)
     const lumAtThresh = 1 - threshold;
     const tx = lumAtThresh * W;
     ctx.strokeStyle = '#e44';
@@ -653,11 +625,10 @@ function updateHistogram(grey, cols, rows) {
   }
 }
 
-// ── Render ASCII preview ──────────────────────────────────────────────────────
+// ── Render Preview (Optimized for High Column Densities) ───────────────────
 function render() {
   if (!currentImage) return;
 
-  // Update image previews
   updateImagePreviews();
 
   const result = imageToAscii(currentImage);
@@ -679,7 +650,14 @@ function render() {
   }
 
   pre.style.fontSize = fs + 'px';
-  pre.textContent = result.lines.join('\n');
+  
+  // Performance safeguard: truncate the web UI preview string if it's overwhelmingly long, 
+  // keeping the canvas layout completely responsive. Full array is preserved for export intact.
+  if (result.cols > 800) {
+    pre.textContent = result.lines.map(l => l.substring(0, 800) + '...').slice(0, 500).join('\n') + '\n\n[Preview cropped for browser performance. Full resolution will export perfectly!]';
+  } else {
+    pre.textContent = result.lines.join('\n');
+  }
 
   requestAnimationFrame(() => {
     wrap.style.transform = 'scale(1)';
@@ -700,13 +678,14 @@ function render() {
   document.getElementById('stat-chars').textContent = result.placedCount.toLocaleString();
   document.getElementById('stat-size').textContent = Math.round(result.cols * charH * charRatio);
   document.getElementById('stats').style.display = 'grid';
+  
   document.getElementById('export-btn').disabled = false;
+  document.getElementById('copy-btn').disabled = false;
+  document.getElementById('txt-btn').disabled = false;
 }
 
-// ── Build DXF ─────────────────────────────────────────────────────────────────
 function buildDXF() {
   const charH = parseFloat(document.getElementById('charheight').value);
-  const charW = charH * parseFloat(document.getElementById('charratio').value);
   const layer = (document.getElementById('layer-name').value || 'ASCII').replace(/[^A-Za-z0-9_\-]/g, '_');
   const rows = asciiLines.length;
 
@@ -716,20 +695,26 @@ function buildDXF() {
   dxf += '0\nSECTION\n2\nENTITIES\n';
 
   for (let r = 0; r < rows; r++) {
-    const line = asciiLines[r];
+    const rawLine = asciiLines[r];
+    const trimmedLine = rawLine.trimEnd();
+    if (trimmedLine.length === 0) continue;
+
+    const spaceOffset = trimmedLine.length - trimmedLine.trimStart().length;
+    const cleanStr = trimmedLine.trimStart();
+
+    const charW = charH * parseFloat(document.getElementById('charratio').value);
+    const x = (spaceOffset * charW).toFixed(6);
     const y = ((rows - r - 1) * charH).toFixed(6);
-    for (let c = 0; c < line.length; c++) {
-      const ch = line[c];
-      if (ch === ' ') continue;
-      const x = (c * charW).toFixed(6);
-      dxf += '0\nTEXT\n8\n' + layer + '\n10\n' + x + '\n20\n' + y + '\n30\n0.0\n40\n' + charH.toFixed(6) + '\n1\n' + ch + '\n';
-    }
+
+    // Escape parenthesis matching standard DXF layout formatting validation
+    const escapedStr = cleanStr.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+
+    dxf += '0\nTEXT\n8\n' + layer + '\n10\n' + x + '\n20\n' + y + '\n30\n0.0\n40\n' + charH.toFixed(6) + '\n1\n' + escapedStr + '\n';
   }
   dxf += '0\nENDSEC\n0\nEOF\n';
   return dxf;
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
 function fitPreview() {
   const wrap = document.getElementById('ascii-scale-wrap');
   const pre  = document.getElementById('ascii-output');
@@ -761,13 +746,36 @@ function loadFile(file) {
   reader.readAsDataURL(file);
 }
 
-// ── Event wiring ──────────────────────────────────────────────────────────────
 document.getElementById('export-btn').addEventListener('click', () => {
   if (!asciiLines.length) return;
   const blob = new Blob([buildDXF()], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'ascii_output.dxf';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  if (!asciiLines.length) return;
+  const textContent = asciiLines.join('\n');
+  const btn = document.getElementById('copy-btn');
+  try {
+    await navigator.clipboard.writeText(textContent);
+    const oldText = btn.innerHTML;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.innerHTML = oldText; }, 1500);
+  } catch (err) {
+    alert('Failed to copy text.');
+  }
+});
+
+document.getElementById('txt-btn').addEventListener('click', () => {
+  if (!asciiLines.length) return;
+  const blob = new Blob([asciiLines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ascii_art.txt';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
@@ -846,7 +854,6 @@ document.getElementById('custom-chars').addEventListener('input', render);
 document.getElementById('dither').addEventListener('change', render);
 window.addEventListener('resize', fitPreview);
 
-// Init UI state
 document.getElementById('threshold-section').style.display = 'block';
 document.getElementById('fg-char-section').style.display   = 'block';
 document.getElementById('custom-chars-wrap').style.display  = 'none';
